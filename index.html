@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerenciamento de Roteiros</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #e3f2fd, #f5f7fa);
+    margin: 0;
+}
+
+/* LOGIN */
+.login {
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.login-box {
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.2);
+    width:300px;
+}
+.login-box input {
+    width:100%;
+    padding:10px;
+    margin:8px 0;
+}
+.login-box button {
+    width:100%;
+    padding:10px;
+    background:#007bff;
+    color:white;
+    border:none;
+    border-radius:6px;
+}
+
+/* APP */
+.container {
+    max-width: 1000px;
+    margin: 20px auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    display:none;
+}
+
+h1 { text-align: center; }
+
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+button {
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-add { background: #28a745; color: #fff; width: 100%; }
+.btn-edit { background: #ffc107; }
+.btn-delete { background: #dc3545; color: #fff; }
+
+.actions { display: flex; gap: 10px; margin: 10px 0; }
+.btn-pdf { background: #dc3545; color: white; flex:1; }
+.btn-excel { background: #007bff; color: white; flex:1; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th {
+    background: #007bff;
+    color: white;
+    padding: 10px;
+}
+
+td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
+}
+
+.total {
+    margin-top: 10px;
+    font-weight: bold;
+    text-align: right;
+}
+
+/* BARRA */
+.qtd-cell { position: relative; overflow: hidden; font-weight: bold; border-radius: 6px; }
+.qtd-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    opacity: 0.35;
+    transition: width 0.6s ease;
+}
+
+.qtd-baixa { background: #d4edda; color: #155724; }
+.qtd-media { background: #fff3cd; color: #856404; }
+.qtd-alta  { background: #f8d7da; color: #721c24; }
+
+.bar-baixa { background: #28a745; }
+.bar-media { background: #ffc107; }
+.bar-alta  { background: #dc3545; }
+
+@keyframes piscar {
+    0% { box-shadow: 0 0 5px red; }
+    50% { box-shadow: 0 0 15px red; }
+    100% { box-shadow: 0 0 5px red; }
+}
+.alerta { animation: piscar 0.7s infinite; }
+</style>
+
+</head>
+
+<body>
+
+<!-- LOGIN -->
+
+<div class="login" id="loginScreen">
+    <div class="login-box">
+        <h3>Login</h3>
+        <input id="user" placeholder="Usuário">
+        <input id="pass" type="password" placeholder="Senha">
+        <button onclick="login()">Entrar</button>
+    </div>
+</div>
+
+<!-- APP -->
+
+<div class="container" id="app">
+    <h1>Gerenciamento de Roteiros</h1>
+
+```
+<input type="text" id="id" placeholder="ID do Roteiro">
+<input type="text" id="rua" placeholder="Nome da Rua">
+<input type="number" id="quantidade" placeholder="Quantidade">
+<textarea id="observacoes" placeholder="Observações"></textarea>
+
+<button class="btn-add" onclick="adicionarOuEditar()">Salvar Roteiro</button>
+
+<div class="actions">
+    <button class="btn-pdf" onclick="exportarPDF()">PDF</button>
+    <button class="btn-excel" onclick="exportarExcel()">Excel</button>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Rua</th>
+            <th>Quantidade</th>
+            <th>Observações</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+</table>
+
+<div class="total" id="total">Total: 0</div>
+```
+
+</div>
+
+<script>
+const LOGIN = "EntregAmazon";
+const SENHA = "Heitor@20";
+
+function login(){
+    const u = document.getElementById("user").value;
+    const p = document.getElementById("pass").value;
+
+    if(u === LOGIN && p === SENHA){
+        document.getElementById("loginScreen").style.display="none";
+        document.getElementById("app").style.display="block";
+    } else {
+        alert("Login inválido");
+    }
+}
+
+/* SISTEMA */
+let roteiros = JSON.parse(localStorage.getItem("roteiros")) || [];
+let editIndex = null;
+
+function salvarLocal() {
+    localStorage.setItem("roteiros", JSON.stringify(roteiros));
+}
+
+function adicionarOuEditar() {
+    const id = document.getElementById('id').value;
+    const rua = document.getElementById('rua').value;
+    const quantidade = parseInt(document.getElementById('quantidade').value);
+    const observacoes = document.getElementById('observacoes').value;
+
+    if (!id || !rua || !quantidade) {
+        alert("Preencha os campos obrigatórios!");
+        return;
+    }
+
+    const roteiro = { id, rua, quantidade, observacoes };
+
+    if (editIndex === null) {
+        roteiros.push(roteiro);
+    } else {
+        roteiros[editIndex] = roteiro;
+        editIndex = null;
+    }
+
+    salvarLocal();
+    render();
+    limpar();
+}
+
+function render() {
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+
+    roteiros.forEach((r, i) => {
+        let classe = "";
+        let barClass = "";
+
+        if (r.quantidade <= 10) {
+            classe = "qtd-baixa";
+            barClass = "bar-baixa";
+        } else if (r.quantidade <= 30) {
+            classe = "qtd-media";
+            barClass = "bar-media";
+        } else {
+            classe = "qtd-alta";
+            barClass = "bar-alta";
+        }
+
+        const alerta = r.quantidade > 100 ? "alerta" : "";
+        const porcentagem = Math.min(r.quantidade, 100);
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${r.id}</td>
+            <td>${r.rua}</td>
+            <td class="qtd-cell ${classe} ${alerta}">
+                <div class="qtd-bar ${barClass}" style="width:${porcentagem}%"></div>
+                ${r.quantidade}
+            </td>
+            <td>${r.observacoes}</td>
+            <td>
+                <button class="btn-edit" onclick="editar(${i})">Editar</button>
+                <button class="btn-delete" onclick="excluir(${i})">Excluir</button>
+            </td>
+        </tr>`;
+    });
+
+    atualizarTotal();
+}
+
+function editar(index) {
+    const r = roteiros[index];
+    id.value = r.id;
+    rua.value = r.rua;
+    quantidade.value = r.quantidade;
+    observacoes.value = r.observacoes;
+    editIndex = index;
+}
+
+function excluir(index) {
+    if (confirm("Deseja excluir este roteiro?")) {
+        roteiros.splice(index, 1);
+        salvarLocal();
+        render();
+    }
+}
+
+function atualizarTotal() {
+    const total = roteiros.reduce((s, r) => s + r.quantidade, 0);
+    document.getElementById('total').innerText = "Total: " + total;
+}
+
+function limpar() {
+    id.value = "";
+    rua.value = "";
+    quantidade.value = "";
+    observacoes.value = "";
+}
+
+function exportarExcel() {
+    const ws = XLSX.utils.json_to_sheet(roteiros);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Roteiros");
+    XLSX.writeFile(wb, "roteiros.xlsx");
+}
+
+function exportarPDF() {
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Título
+    doc.setFontSize(16);
+    doc.setTextColor(31, 60, 136);
+    doc.text("Relatório de Roteiros de Entrega", 105, 15, {
+        align: "center"
+    });
+
+    // Data
+    doc.setFontSize(10);
+    doc.setTextColor(0,0,0);
+    doc.text(
+        "Gerado em: " + new Date().toLocaleString(),
+        14,
+        25
+    );
+
+
+    const dados = roteiros.map(r => [
+        r.id,
+        r.rua,
+        r.quantidade,
+        r.observacoes || "-"
+    ]);
+
+
+    doc.autoTable({
+
+        startY: 35,
+
+        head: [
+            [
+                "ID",
+                "Rua",
+                "Quantidade",
+                "Observações"
+            ]
+        ],
+
+        body: dados,
+
+
+        styles:{
+            fontSize:10,
+            cellPadding:4
+        },
+
+
+        headStyles:{
+            fillColor:[0,123,255],
+            textColor:255,
+            fontStyle:"bold"
+        },
+
+
+        alternateRowStyles:{
+            fillColor:[245,245,245]
+        },
+
+
+        columnStyles:{
+            0:{cellWidth:20},
+            1:{cellWidth:55},
+            2:{cellWidth:30},
+            3:{cellWidth:70}
+        },
+
+
+        didParseCell:function(data){
+
+            // Coluna quantidade
+            if(data.column.index === 2 && data.section === "body"){
+
+                let qtd = Number(data.cell.raw);
+
+
+                if(qtd <= 10){
+
+                    data.cell.styles.fillColor=[212,237,218];
+                    data.cell.styles.textColor=[21,87,36];
+
+                } 
+                else if(qtd <=30){
+
+                    data.cell.styles.fillColor=[255,243,205];
+                    data.cell.styles.textColor=[133,100,4];
+
+                }
+                else{
+
+                    data.cell.styles.fillColor=[248,215,218];
+                    data.cell.styles.textColor=[114,28,36];
+
+                }
+
+
+                // 🚨 Acima de 100
+                if(qtd > 100){
+
+                    data.cell.styles.fillColor=[255,0,0];
+                    data.cell.styles.textColor=[255,255,255];
+                    data.cell.styles.fontStyle="bold";
+
+                }
+
+            }
+
+        }
+
+    });
+
+
+    const total = roteiros.reduce(
+        (s,r)=>s+r.quantidade,0
+    );
+
+
+    let finalY = doc.lastAutoTable.finalY + 15;
+
+
+    doc.setFontSize(13);
+    doc.setTextColor(31,60,136);
+
+    doc.text(
+        `TOTAL DE PACOTES: ${total}`,
+        14,
+        finalY
+    );
+
+
+    doc.save("Relatorio_Roteiros_Colorido.pdf");
+}
+
+render();
+</script>
+
+</body>
+</html>
