@@ -1,455 +1,560 @@
 <!DOCTYPE html>
-
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gerenciamento de Roteiros</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Roteiros - Entregas</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #007bff;
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #e3f2fd, #f5f7fa);
+            margin: 0;
+            padding: 0;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        /* LOGIN */
+        .login {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #007bff, #00c6ff);
+        }
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 320px;
+            text-align: center;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+        /* APP */
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 25px;
+            display: none;
+        }
 
-<style>
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #e3f2fd, #f5f7fa);
-    margin: 0;
-}
+        h1, h3 {
+            color: #1e3a8a;
+        }
 
-/* LOGIN */
-.login {
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
-.login-box {
-    background:white;
-    padding:30px;
-    border-radius:10px;
-    box-shadow:0 10px 25px rgba(0,0,0,0.2);
-    width:300px;
-}
-.login-box input {
-    width:100%;
-    padding:10px;
-    margin:8px 0;
-}
-.login-box button {
-    width:100%;
-    padding:10px;
-    background:#007bff;
-    color:white;
-    border:none;
-    border-radius:6px;
-}
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
 
-/* APP */
-.container {
-    max-width: 1000px;
-    margin: 20px auto;
-    background: #fff;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    display:none;
-}
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
 
-h1 { text-align: center; }
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
 
-input, textarea {
-    width: 100%;
-    padding: 10px;
-    margin: 6px 0;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-}
+        .btn-add { background: #28a745; color: white; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; }
+        .btn-danger { background: #dc3545; color: white; }
 
-button {
-    padding: 10px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: bold;
-}
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
 
-.btn-add { background: #28a745; color: #fff; width: 100%; }
-.btn-edit { background: #ffc107; }
-.btn-delete { background: #dc3545; color: #fff; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
 
-.actions { display: flex; gap: 10px; margin: 10px 0; }
-.btn-pdf { background: #dc3545; color: white; flex:1; }
-.btn-excel { background: #007bff; color: white; flex:1; }
+        th {
+            background: var(--primary);
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-}
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
 
-th {
-    background: #007bff;
-    color: white;
-    padding: 10px;
-}
+        .qtd-cell { 
+            position: relative; 
+            overflow: hidden; 
+            font-weight: bold; 
+            border-radius: 6px; 
+        }
+        .qtd-bar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            opacity: 0.3;
+            transition: width 0.6s ease;
+        }
 
-td {
-    padding: 8px;
-    border-bottom: 1px solid #ddd;
-    text-align: center;
-}
+        .total {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: right;
+            margin-top: 15px;
+            color: #1e3a8a;
+        }
 
-.total {
-    margin-top: 10px;
-    font-weight: bold;
-    text-align: right;
-}
+        /* Map */
+        #mapa {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
 
-/* BARRA */
-.qtd-cell { position: relative; overflow: hidden; font-weight: bold; border-radius: 6px; }
-.qtd-bar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    height: 100%;
-    opacity: 0.35;
-    transition: width 0.6s ease;
-}
+        .roteiro-item {
+            padding: 12px;
+            background: #f8f9fa;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 5px solid var(--primary);
+        }
 
-.qtd-baixa { background: #d4edda; color: #155724; }
-.qtd-media { background: #fff3cd; color: #856404; }
-.qtd-alta  { background: #f8d7da; color: #721c24; }
-
-.bar-baixa { background: #28a745; }
-.bar-media { background: #ffc107; }
-.bar-alta  { background: #dc3545; }
-
-@keyframes piscar {
-    0% { box-shadow: 0 0 5px red; }
-    50% { box-shadow: 0 0 15px red; }
-    100% { box-shadow: 0 0 5px red; }
-}
-.alerta { animation: piscar 0.7s infinite; }
-</style>
-
+        @keyframes piscar {
+            0% { box-shadow: 0 0 5px red; }
+            50% { box-shadow: 0 0 20px red; }
+            100% { box-shadow: 0 0 5px red; }
+        }
+        .alerta { animation: piscar 0.8s infinite; }
+    </style>
 </head>
 
 <body>
 
 <!-- LOGIN -->
-
 <div class="login" id="loginScreen">
     <div class="login-box">
-        <h3>Login</h3>
-        <input id="user" placeholder="Usuário">
-        <input id="pass" type="password" placeholder="Senha">
+        <h3>🚚 EntregAmazon</h3>
+        <input id="user" placeholder="Usuário" value="admin">
+        <input id="pass" type="password" placeholder="Senha" value="Heitor@20">
         <button onclick="login()">Entrar</button>
     </div>
 </div>
 
 <!-- APP -->
-
 <div class="container" id="app">
-    <h1>Gerenciamento de Roteiros de Claudiane❤️</h1>
+    <h1>🚚 Gerenciamento de Roteiros de Entrega</h1>
 
-```
-<input type="text" id="id" placeholder="ID do Roteiro">
-<input type="text" id="rua" placeholder="Nome da Rua">
-<input type="number" id="quantidade" placeholder="Quantidade">
-<textarea id="observacoes" placeholder="Observações"></textarea>
+    <!-- CADASTRO EM MASSA -->
+    <div class="card">
+        <h3>➕ Cadastro em Massa de Entregas</h3>
+        <label><strong>Cole uma lista de endereços:</strong></label>
+        <textarea id="listaEnderecos" rows="6" placeholder="Rua José Bonifácio,120&#10;Rua da Aurora,580&#10;Rua Benfica,45&#10;Rua Padre Roma,90"></textarea>
+        <div style="margin-top:10px">
+            <button class="btn-success" onclick="importarLista()">➕ Adicionar Lista</button>
+            <button class="btn-primary" onclick="gerarMelhorRota()">🗺️ Gerar Melhor Roteiro</button>
+        </div>
+    </div>
 
-<button class="btn-add" onclick="adicionarOuEditar()">Salvar Roteiro</button>
+    <!-- FORMULÁRIO INDIVIDUAL -->
+    <div class="card">
+        <h3>📝 Cadastro Individual</h3>
+        <input type="text" id="id" placeholder="ID da Entrega">
+        <input type="text" id="rua" placeholder="Nome da Rua">
+        <input type="text" id="numero" placeholder="Número">
+        <input type="number" id="quantidade" placeholder="Quantidade de Pacotes">
+        <textarea id="observacoes" placeholder="Observações"></textarea>
+        <button class="btn-add" onclick="adicionarOuEditar()">💾 Salvar Entrega</button>
+    </div>
 
-<div class="actions">
-    <button class="btn-pdf" onclick="exportarPDF()">PDF</button>
-    <button class="btn-excel" onclick="exportarExcel()">Excel</button>
-</div>
+    <!-- TABELA -->
+    <div class="card">
+        <h3>📋 Entregas Cadastradas</h3>
+        <div class="actions">
+            <button class="btn-danger" onclick="exportarPDF()">📄 Exportar PDF</button>
+            <button class="btn-primary" onclick="exportarExcel()">📊 Exportar Excel</button>
+            <button onclick="limparTudo()" class="btn-danger">🗑️ Limpar Tudo</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Ordem</th>
+                    <th>ID</th>
+                    <th>Rua</th>
+                    <th>Número</th>
+                    <th>Quantidade</th>
+                    <th>Distância (km)</th>
+                    <th>Tempo (min)</th>
+                    <th>Status</th>
+                    <th>Observações</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+        <div class="total" id="total">Total de Pacotes: 0 | Entregas: 0</div>
+    </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Rua</th>
-            <th>Quantidade</th>
-            <th>Observações</th>
-            <th>Ações</th>
-        </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-</table>
+    <!-- ROTEIRO OTIMIZADO -->
+    <div class="card">
+        <h3>📍 Roteiro Otimizado</h3>
+        <div id="roteiroGerado" style="max-height:400px; overflow-y:auto;">
+            Nenhuma rota gerada ainda.
+        </div>
+        <div id="resumoRota" style="margin-top:15px; font-weight:bold; color:#1e3a8a;">
+            Distância Total: 0 km<br>
+            Tempo Estimado: 0 min
+        </div>
+    </div>
 
-<div class="total" id="total">Total: 0</div>
-```
-
+    <!-- MAPA -->
+    <div class="card">
+        <h3>🗺️ Mapa das Entregas</h3>
+        <div id="mapa"></div>
+    </div>
 </div>
 
 <script>
+// ==================== CONFIGURAÇÃO ====================
 const LOGIN = "EntregAmazon";
 const SENHA = "Heitor@20";
 
-function login(){
-    const u = document.getElementById("user").value;
-    const p = document.getElementById("pass").value;
+let entregas = JSON.parse(localStorage.getItem("entregas")) || [];
+let editIndex = null;
+let mapa;
+let marcadores = [];
 
-    if(u === LOGIN && p === SENHA){
-        document.getElementById("loginScreen").style.display="none";
-        document.getElementById("app").style.display="block";
+// ==================== LOGIN ====================
+function login() {
+    const u = document.getElementById("user").value.trim();
+    const p = document.getElementById("pass").value.trim();
+    if (u === LOGIN && p === SENHA) {
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        initMapa();
+        render();
     } else {
-        alert("Login inválido");
+        alert("❌ Login inválido!");
     }
 }
 
-/* SISTEMA */
-let roteiros = JSON.parse(localStorage.getItem("roteiros")) || [];
-let editIndex = null;
+// ==================== MAPA ====================
+function initMapa() {
+    mapa = L.map('mapa').setView([-8.0476, -34.8770], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(mapa);
+    atualizarMapa();
+}
 
+function atualizarMapa() {
+    marcadores.forEach(m => mapa.removeLayer(m));
+    marcadores = [];
+    
+    entregas.forEach(entrega => {
+        if (entrega.lat && entrega.lng) {
+            const marker = L.marker([entrega.lat, entrega.lng])
+                .addTo(mapa)
+                .bindPopup(`<b>${entrega.rua}, ${entrega.numero}</b><br>${entrega.quantidade} pacotes`);
+            marcadores.push(marker);
+        }
+    });
+}
+
+// ==================== CRUD ====================
 function salvarLocal() {
-    localStorage.setItem("roteiros", JSON.stringify(roteiros));
+    localStorage.setItem("entregas", JSON.stringify(entregas));
 }
 
 function adicionarOuEditar() {
-    const id = document.getElementById('id').value;
-    const rua = document.getElementById('rua').value;
-    const quantidade = parseInt(document.getElementById('quantidade').value);
-    const observacoes = document.getElementById('observacoes').value;
+    const id = document.getElementById('id').value.trim() || "ENT-" + Date.now().toString().slice(-6);
+    const rua = document.getElementById('rua').value.trim();
+    const numero = document.getElementById('numero').value.trim();
+    const quantidade = parseInt(document.getElementById('quantidade').value) || 1;
+    const observacoes = document.getElementById('observacoes').value.trim();
 
-    if (!id || !rua || !quantidade) {
-        alert("Preencha os campos obrigatórios!");
+    if (!rua) {
+        alert("Preencha pelo menos o nome da rua!");
         return;
     }
 
-    const roteiro = { id, rua, quantidade, observacoes };
+    const entrega = {
+        id,
+        rua,
+        numero,
+        quantidade,
+        observacoes,
+        status: "Pendente",
+        ordem: null,
+        distancia: (Math.random() * 5 + 1).toFixed(1), // Simulado
+        tempo: (Math.random() * 20 + 10).toFixed(0),   // Simulado
+        lat: -8.0476 + (Math.random() - 0.5) * 0.05,
+        lng: -34.8770 + (Math.random() - 0.5) * 0.05
+    };
 
     if (editIndex === null) {
-        roteiros.push(roteiro);
+        entregas.push(entrega);
     } else {
-        roteiros[editIndex] = roteiro;
+        entregas[editIndex] = entrega;
         editIndex = null;
     }
 
     salvarLocal();
     render();
-    limpar();
-}
-
-function render() {
-    const tbody = document.getElementById("tbody");
-    tbody.innerHTML = "";
-
-    roteiros.forEach((r, i) => {
-        let classe = "";
-        let barClass = "";
-
-        if (r.quantidade <= 10) {
-            classe = "qtd-baixa";
-            barClass = "bar-baixa";
-        } else if (r.quantidade <= 30) {
-            classe = "qtd-media";
-            barClass = "bar-media";
-        } else {
-            classe = "qtd-alta";
-            barClass = "bar-alta";
-        }
-
-        const alerta = r.quantidade > 100 ? "alerta" : "";
-        const porcentagem = Math.min(r.quantidade, 100);
-
-        tbody.innerHTML += `
-        <tr>
-            <td>${r.id}</td>
-            <td>${r.rua}</td>
-            <td class="qtd-cell ${classe} ${alerta}">
-                <div class="qtd-bar ${barClass}" style="width:${porcentagem}%"></div>
-                ${r.quantidade}
-            </td>
-            <td>${r.observacoes}</td>
-            <td>
-                <button class="btn-edit" onclick="editar(${i})">Editar</button>
-                <button class="btn-delete" onclick="excluir(${i})">Excluir</button>
-            </td>
-        </tr>`;
-    });
-
-    atualizarTotal();
+    limparFormulario();
+    atualizarMapa();
 }
 
 function editar(index) {
-    const r = roteiros[index];
-    id.value = r.id;
-    rua.value = r.rua;
-    quantidade.value = r.quantidade;
-    observacoes.value = r.observacoes;
+    const e = entregas[index];
+    document.getElementById('id').value = e.id;
+    document.getElementById('rua').value = e.rua;
+    document.getElementById('numero').value = e.numero || "";
+    document.getElementById('quantidade').value = e.quantidade;
+    document.getElementById('observacoes').value = e.observacoes || "";
     editIndex = index;
 }
 
 function excluir(index) {
-    if (confirm("Deseja excluir este roteiro?")) {
-        roteiros.splice(index, 1);
+    if (confirm("Excluir esta entrega?")) {
+        entregas.splice(index, 1);
         salvarLocal();
         render();
+        atualizarMapa();
     }
 }
 
-function atualizarTotal() {
-    const total = roteiros.reduce((s, r) => s + r.quantidade, 0);
-    document.getElementById('total').innerText = "Total: " + total;
+// ==================== MASSA ====================
+function importarLista() {
+    const texto = document.getElementById("listaEnderecos").value.trim();
+    if (!texto) return alert("Cole os endereços primeiro!");
+
+    const linhas = texto.split("\n");
+    let adicionados = 0;
+
+    linhas.forEach(linha => {
+        if (!linha.trim()) return;
+        const partes = linha.split(",");
+        const rua = partes[0]?.trim();
+        const numero = partes[1]?.trim() || "";
+
+        if (rua) {
+            entregas.push({
+                id: "ENT-" + Date.now().toString().slice(-6) + Math.floor(Math.random()*100),
+                rua,
+                numero,
+                quantidade: 1,
+                observacoes: "",
+                status: "Pendente",
+                ordem: null,
+                distancia: (Math.random() * 5 + 1).toFixed(1),
+                tempo: (Math.random() * 20 + 10).toFixed(0),
+                lat: -8.0476 + (Math.random() - 0.5) * 0.05,
+                lng: -34.8770 + (Math.random() - 0.5) * 0.05
+            });
+            adicionados++;
+        }
+    });
+
+    salvarLocal();
+    render();
+    atualizarMapa();
+    alert(`${adicionados} entregas adicionadas com sucesso!`);
 }
 
-function limpar() {
-    id.value = "";
-    rua.value = "";
-    quantidade.value = "";
-    observacoes.value = "";
+// ==================== ROTEIRO ====================
+function gerarMelhorRota() {
+    if (entregas.length === 0) return alert("Nenhuma entrega cadastrada!");
+
+    // Simulação simples de ordenação (rua + número)
+    entregas.sort((a, b) => {
+        if (a.rua === b.rua) return parseInt(a.numero || 0) - parseInt(b.numero || 0);
+        return a.rua.localeCompare(b.rua);
+    });
+
+    entregas.forEach((item, index) => {
+        item.ordem = index + 1;
+    });
+
+    let html = "";
+    let distTotal = 0;
+    let tempoTotal = 0;
+
+    entregas.forEach(item => {
+        html += `
+        <div class="roteiro-item">
+            <strong>${item.ordem}º</strong> - ${item.rua}, ${item.numero || "S/N"} 
+            <span style="color:#28a745;">(${item.quantidade} pacotes)</span>
+            <button onclick="abrirMapa('${item.rua}, ${item.numero}')" style="float:right; font-size:0.9em;">📍</button>
+        </div>`;
+        distTotal += parseFloat(item.distancia);
+        tempoTotal += parseInt(item.tempo);
+    });
+
+    document.getElementById("roteiroGerado").innerHTML = html;
+    document.getElementById("resumoRota").innerHTML = `
+        Distância Total Estimada: <strong>${distTotal.toFixed(1)} km</strong><br>
+        Tempo Estimado: <strong>${tempoTotal} minutos</strong>
+    `;
+
+    salvarLocal();
+    render();
 }
 
+function abrirMapa(endereco) {
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+    window.open(url, "_blank");
+}
+
+// ==================== RENDER ====================
+function render() {
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+
+    entregas.forEach((e, i) => {
+        let classe = e.quantidade <= 10 ? "qtd-baixa" : e.quantidade <= 30 ? "qtd-media" : "qtd-alta";
+        let alerta = e.quantidade > 80 ? "alerta" : "";
+
+        tbody.innerHTML += `
+        <tr>
+            <td><strong>${e.ordem || "-"}</strong></td>
+            <td>${e.id}</td>
+            <td>${e.rua}</td>
+            <td>${e.numero || "-"}</td>
+            <td class="qtd-cell ${classe} ${alerta}">
+                <div class="qtd-bar ${classe.replace('qtd','bar')}" style="width:${Math.min(e.quantidade,100)}%"></div>
+                ${e.quantidade}
+            </td>
+            <td>${e.distancia} km</td>
+            <td>${e.tempo} min</td>
+            <td><span style="color:${e.status==='Pendente'?'#ffc107':'#28a745'}">${e.status}</span></td>
+            <td>${e.observacoes || "-"}</td>
+            <td>
+                <button class="btn-warning" onclick="editar(${i})">✏️</button>
+                <button class="btn-danger" onclick="excluir(${i})">🗑️</button>
+            </td>
+        </tr>`;
+    });
+
+    const totalPacotes = entregas.reduce((s, e) => s + e.quantidade, 0);
+    document.getElementById("total").innerHTML = `Total de Pacotes: <strong>${totalPacotes}</strong> | Entregas: <strong>${entregas.length}</strong>`;
+}
+
+// ==================== EXPORT ====================
 function exportarExcel() {
-    const ws = XLSX.utils.json_to_sheet(roteiros);
+    const ws = XLSX.utils.json_to_sheet(entregas);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Roteiros");
-    XLSX.writeFile(wb, "roteiros.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+    XLSX.writeFile(wb, "Roteiro_Entregas.xlsx");
 }
 
 function exportarPDF() {
-
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Título
-    doc.setFontSize(16);
-    doc.setTextColor(31, 60, 136);
-    doc.text("Relatório de Roteiros de Entrega", 105, 15, {
-        align: "center"
-    });
+    doc.setFontSize(18);
+    doc.text("Relatório de Roteiro de Entregas", 105, 20, { align: "center" });
+    doc.setFontSize(11);
+    doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
 
-    // Data
-    doc.setFontSize(10);
-    doc.setTextColor(0,0,0);
-    doc.text(
-        "Gerado em: " + new Date().toLocaleString(),
-        14,
-        25
-    );
-
-
-    const dados = roteiros.map(r => [
-        r.id,
-        r.rua,
-        r.quantidade,
-        r.observacoes || "-"
+    const dados = entregas.map((e, i) => [
+        e.ordem || i+1,
+        e.id,
+        `${e.rua}, ${e.numero}`,
+        e.quantidade,
+        e.distancia + " km",
+        e.tempo + " min",
+        e.status,
+        e.observacoes || "-"
     ]);
 
-
     doc.autoTable({
-
-        startY: 35,
-
-        head: [
-            [
-                "ID",
-                "Rua",
-                "Quantidade",
-                "Observações"
-            ]
-        ],
-
+        startY: 40,
+        head: [["Ordem", "ID", "Endereço", "Qtd", "Dist.", "Tempo", "Status", "Obs"]],
         body: dados,
-
-
-        styles:{
-            fontSize:10,
-            cellPadding:4
-        },
-
-
-        headStyles:{
-            fillColor:[0,123,255],
-            textColor:255,
-            fontStyle:"bold"
-        },
-
-
-        alternateRowStyles:{
-            fillColor:[245,245,245]
-        },
-
-
-        columnStyles:{
-            0:{cellWidth:20},
-            1:{cellWidth:55},
-            2:{cellWidth:30},
-            3:{cellWidth:70}
-        },
-
-
-        didParseCell:function(data){
-
-            // Coluna quantidade
-            if(data.column.index === 2 && data.section === "body"){
-
-                let qtd = Number(data.cell.raw);
-
-
-                if(qtd <= 10){
-
-                    data.cell.styles.fillColor=[212,237,218];
-                    data.cell.styles.textColor=[21,87,36];
-
-                } 
-                else if(qtd <=30){
-
-                    data.cell.styles.fillColor=[255,243,205];
-                    data.cell.styles.textColor=[133,100,4];
-
-                }
-                else{
-
-                    data.cell.styles.fillColor=[248,215,218];
-                    data.cell.styles.textColor=[114,28,36];
-
-                }
-
-
-                // 🚨 Acima de 100
-                if(qtd > 100){
-
-                    data.cell.styles.fillColor=[255,0,0];
-                    data.cell.styles.textColor=[255,255,255];
-                    data.cell.styles.fontStyle="bold";
-
-                }
-
-            }
-
-        }
-
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [0, 123, 255] }
     });
 
-
-    const total = roteiros.reduce(
-        (s,r)=>s+r.quantidade,0
-    );
-
-
-    let finalY = doc.lastAutoTable.finalY + 15;
-
-
-    doc.setFontSize(13);
-    doc.setTextColor(31,60,136);
-
-    doc.text(
-        `TOTAL DE PACOTES: ${total}`,
-        14,
-        finalY
-    );
-
-
-    doc.save("Relatorio_Roteiros_Colorido.pdf");
+    doc.save("Roteiro_Entregas.pdf");
 }
 
-render();
+// ==================== UTILS ====================
+function limparFormulario() {
+    document.getElementById('id').value = "";
+    document.getElementById('rua').value = "";
+    document.getElementById('numero').value = "";
+    document.getElementById('quantidade').value = "";
+    document.getElementById('observacoes').value = "";
+}
+
+function limparTudo() {
+    if (confirm("Limpar TODAS as entregas? Esta ação não pode ser desfeita.")) {
+        entregas = [];
+        salvarLocal();
+        render();
+        document.getElementById("roteiroGerado").innerHTML = "Nenhuma rota gerada.";
+        atualizarMapa();
+    }
+}
+
+// ==================== INIT ====================
+window.onload = function() {
+    // Preload demo data if empty
+    if (entregas.length === 0) {
+        entregas = [
+            {id:"ENT-001", rua:"Rua José Bonifácio", numero:"120", quantidade:15, observacoes:"Entregar na portaria", status:"Pendente", ordem:1, distancia:"2.3", tempo:"12", lat:-8.05, lng:-34.88},
+            {id:"ENT-002", rua:"Rua da Aurora", numero:"580", quantidade:8, observacoes:"", status:"Pendente", ordem:2, distancia:"3.1", tempo:"18", lat:-8.04, lng:-34.87}
+        ];
+        salvarLocal();
+    }
+    render();
+};
 </script>
 
 </body>
