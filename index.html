@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciamento de Roteiros - Entregas</title>
-    
+   
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
     <style>
         :root {
             --primary: #3c89d1;
@@ -21,7 +20,6 @@
             margin: 0;
             padding: 0;
         }
-
         .login { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #b65471, #00c6ff); }
         .login-box {
             background: white;
@@ -32,7 +30,6 @@
             text-align: center;
         }
         .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
-
         .container {
             max-width: 1200px;
             margin: 20px auto;
@@ -42,7 +39,6 @@
             padding: 25px;
             display: none;
         }
-
         .card {
             background: rgb(255, 255, 255);
             border-radius: 10px;
@@ -50,9 +46,11 @@
             margin-bottom: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         }
-
+        .origin-card {
+            background: #e3f2fd;
+            border-left: 5px solid #3c89d1;
+        }
         input, textarea { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; }
-
         button {
             padding: 10px 16px;
             border: none;
@@ -60,23 +58,19 @@
             cursor: pointer;
             font-weight: bold;
         }
-
         .btn-add { background: #28a745; color: white; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-warning { background: #ffc107; }
         .btn-danger { background: #dc3545; color: white; }
-
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th { background: var(--primary); color: white; padding: 12px; text-align: left; }
         td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
-
-        /* === NOVA COLORAÇÃO DA COLUNA QUANTIDADE === */
-        .qtd-cell { 
-            position: relative; 
-            overflow: hidden; 
-            font-weight: bold; 
-            border-radius: 6px; 
+        .qtd-cell {
+            position: relative;
+            overflow: hidden;
+            font-weight: bold;
+            border-radius: 6px;
             text-align: center;
         }
         .qtd-bar {
@@ -87,23 +81,18 @@
             opacity: 0.25;
             transition: width 0.6s ease;
         }
-
-        .qtd-verde  { background: #d4edda; color: #155724; }
+        .qtd-verde { background: #d4edda; color: #155724; }
         .qtd-amarelo{ background: #fff3cd; color: #856404; }
         .qtd-vermelho { background: #f8d7da; color: #721c24; }
-
-        .bar-verde  { background: #28a745; }
+        .bar-verde { background: #28a745; }
         .bar-amarelo{ background: #ffc107; }
         .bar-vermelho { background: #dc3545; }
-
         .alerta { animation: piscar 0.8s infinite; }
-
         @keyframes piscar {
             0% { box-shadow: 0 0 5px red; }
             50% { box-shadow: 0 0 20px red; }
             100% { box-shadow: 0 0 5px red; }
         }
-
         .total { font-size: 1.2em; font-weight: bold; text-align: right; margin-top: 15px; color: #1e3a8a; }
         #mapa { width: 100%; height: 500px; border-radius: 10px; border: 1px solid #ddd; }
         .roteiro-item {
@@ -115,9 +104,7 @@
         }
     </style>
 </head>
-
 <body>
-
 <!-- LOGIN -->
 <div class="login" id="loginScreen">
     <div class="login-box">
@@ -131,6 +118,15 @@
 <!-- APP -->
 <div class="container" id="app">
     <h1>🚚 Gerenciamento Roteiros de Entrega de Claudiane ❤️</h1>
+    
+    <!-- Endereço de Origem -->
+    <div class="card origin-card">
+        <h3>📍 Endereço de Origem (Depósito)</h3>
+        <input type="text" id="origemRua" placeholder="Rua do Depósito" value="Rua do Comércio">
+        <input type="text" id="origemNumero" placeholder="Número" value="100">
+        <button class="btn-primary" onclick="salvarOrigem()">💾 Salvar Origem</button>
+        <div id="origemAtual" style="margin-top:10px; font-weight:bold; color:#1e3a8a;"></div>
+    </div>
 
     <div class="card">
         <h3>➕ Cadastro em Massa de Entregas</h3>
@@ -196,6 +192,13 @@ const LOGIN = "EntregAmazon";
 const SENHA = "Heitor@20";
 
 let entregas = JSON.parse(localStorage.getItem("entregas")) || [];
+let origem = JSON.parse(localStorage.getItem("origem")) || {
+    rua: "Rua do Comércio",
+    numero: "100",
+    lat: -8.0476,
+    lng: -34.8770
+};
+
 let editIndex = null;
 let mapa;
 let marcadores = [];
@@ -208,10 +211,34 @@ function login() {
         document.getElementById("loginScreen").style.display = "none";
         document.getElementById("app").style.display = "block";
         initMapa();
+        atualizarOrigemDisplay();
         render();
     } else {
         alert("❌ Login inválido!");
     }
+}
+
+// ==================== ORIGEM ====================
+function salvarOrigem() {
+    const rua = document.getElementById("origemRua").value.trim();
+    const numero = document.getElementById("origemNumero").value.trim();
+    if (!rua) return alert("Preencha o endereço de origem!");
+    
+    origem = {
+        rua,
+        numero: numero || "S/N",
+        lat: -8.0476 + (Math.random() - 0.5) * 0.03,
+        lng: -34.8770 + (Math.random() - 0.5) * 0.03
+    };
+    localStorage.setItem("origem", JSON.stringify(origem));
+    atualizarOrigemDisplay();
+    atualizarMapa();
+    alert("✅ Origem salva com sucesso!");
+}
+
+function atualizarOrigemDisplay() {
+    document.getElementById("origemAtual").innerHTML = 
+        `📍 <strong>${origem.rua}, ${origem.numero}</strong> (${origem.lat.toFixed(4)}, ${origem.lng.toFixed(4)})`;
 }
 
 // ==================== MAPA ====================
@@ -224,6 +251,13 @@ function initMapa() {
 function atualizarMapa() {
     marcadores.forEach(m => mapa.removeLayer(m));
     marcadores = [];
+    
+    // Marcador de Origem
+    const origemMarker = L.marker([origem.lat, origem.lng])
+        .addTo(mapa)
+        .bindPopup(`<b>ORIGEM: ${origem.rua}, ${origem.numero}</b>`);
+    marcadores.push(origemMarker);
+    
     entregas.forEach(entrega => {
         if (entrega.lat && entrega.lng) {
             const marker = L.marker([entrega.lat, entrega.lng])
@@ -234,7 +268,7 @@ function atualizarMapa() {
     });
 }
 
-// ==================== CRUD + COLORAÇÃO ====================
+// ==================== CRUD ====================
 function salvarLocal() {
     localStorage.setItem("entregas", JSON.stringify(entregas));
 }
@@ -245,9 +279,8 @@ function adicionarOuEditar() {
     const numero = document.getElementById('numero').value.trim();
     const quantidade = parseInt(document.getElementById('quantidade').value) || 1;
     const observacoes = document.getElementById('observacoes').value.trim();
-
     if (!rua) return alert("Preencha o nome da rua!");
-
+    
     const entrega = {
         id, rua, numero, quantidade, observacoes,
         status: "Pendente",
@@ -257,10 +290,10 @@ function adicionarOuEditar() {
         lat: -8.0476 + (Math.random() - 0.5) * 0.05,
         lng: -34.8770 + (Math.random() - 0.5) * 0.05
     };
-
+    
     if (editIndex === null) entregas.push(entrega);
     else entregas[editIndex] = entrega;
-
+    
     salvarLocal();
     render();
     limparFormulario();
@@ -270,24 +303,11 @@ function adicionarOuEditar() {
 function render() {
     const tbody = document.getElementById("tbody");
     tbody.innerHTML = "";
-
     entregas.forEach((e, i) => {
-        let classeQtd = "";
-        let barClass = "";
-
-        if (e.quantidade <= 5) {
-            classeQtd = "qtd-verde";
-            barClass = "bar-verde";
-        } else if (e.quantidade <= 9) {
-            classeQtd = "qtd-amarelo";
-            barClass = "bar-amarelo";
-        } else {
-            classeQtd = "qtd-vermelho";
-            barClass = "bar-vermelho";
-        }
-
+        let classeQtd = e.quantidade <= 5 ? "qtd-verde" : (e.quantidade <= 9 ? "qtd-amarelo" : "qtd-vermelho");
+        let barClass = e.quantidade <= 5 ? "bar-verde" : (e.quantidade <= 9 ? "bar-amarelo" : "bar-vermelho");
         const alerta = e.quantidade >= 15 ? "alerta" : "";
-
+        
         tbody.innerHTML += `
         <tr>
             <td><strong>${e.ordem || "-"}</strong></td>
@@ -308,13 +328,12 @@ function render() {
             </td>
         </tr>`;
     });
-
+    
     const totalPacotes = entregas.reduce((s, e) => s + e.quantidade, 0);
     document.getElementById("total").innerHTML = `Total de Pacotes: <strong>${totalPacotes}</strong> | Entregas: <strong>${entregas.length}</strong>`;
 }
 
-// Outras funções (editar, excluir, importarLista, gerarMelhorRota, etc.) permanecem iguais ao código anterior.
-
+// ==================== OUTRAS FUNÇÕES ====================
 function editar(index) {
     const e = entregas[index];
     document.getElementById('id').value = e.id;
@@ -334,7 +353,7 @@ function excluir(index) {
     }
 }
 
-function importarLista() { /* ... mesmo código anterior ... */ 
+function importarLista() {
     const texto = document.getElementById("listaEnderecos").value.trim();
     if (!texto) return alert("Cole os endereços primeiro!");
     const linhas = texto.split("\n");
@@ -362,22 +381,54 @@ function importarLista() { /* ... mesmo código anterior ... */
     alert(`${adicionados} entregas adicionadas!`);
 }
 
-function gerarMelhorRota() { /* ... mesmo código anterior ... */ 
+function gerarMelhorRota() {
     if (entregas.length === 0) return alert("Nenhuma entrega cadastrada!");
-    entregas.sort((a, b) => {
-        if (a.rua === b.rua) return (parseInt(a.numero)||0) - (parseInt(b.numero)||0);
-        return a.rua.localeCompare(b.rua);
+    
+    function calcularDistancia(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+    
+    entregas.forEach(entrega => {
+        entrega.distanciaOrigem = calcularDistancia(origem.lat, origem.lng, entrega.lat, entrega.lng).toFixed(1);
     });
+    
+    entregas.sort((a, b) => parseFloat(a.distanciaOrigem) - parseFloat(b.distanciaOrigem));
     entregas.forEach((item, index) => item.ordem = index + 1);
-
+    
     let html = "", distTotal = 0, tempoTotal = 0;
+    let ultimaLat = origem.lat;
+    let ultimaLng = origem.lng;
+    
     entregas.forEach(item => {
-        html += `<div class="roteiro-item"><strong>${item.ordem}º</strong> - ${item.rua}, ${item.numero|| "S/N"} <span style="color:#28a745;">(${item.quantidade} pacotes)</span></div>`;
-        distTotal += parseFloat(item.distancia);
-        tempoTotal += parseInt(item.tempo);
+        const distSegmento = calcularDistancia(ultimaLat, ultimaLng, item.lat, item.lng);
+        distTotal += distSegmento;
+        tempoTotal += Math.round(distSegmento * 3 + 5);
+        
+        html += `<div class="roteiro-item">
+            <strong>${item.ordem}º</strong> - ${item.rua}, ${item.numero|| "S/N"} 
+            <span style="color:#28a745;">(${item.quantidade} pacotes)</span><br>
+            <small>Dist. da Origem: ${item.distanciaOrigem} km</small>
+        </div>`;
+        
+        ultimaLat = item.lat;
+        ultimaLng = item.lng;
     });
+    
+    // Volta à origem
+    distTotal += calcularDistancia(ultimaLat, ultimaLng, origem.lat, origem.lng);
+    
     document.getElementById("roteiroGerado").innerHTML = html;
-    document.getElementById("resumoRota").innerHTML = `Distância Total Estimada: <strong>${distTotal.toFixed(1)} km</strong><br>Tempo Estimado: <strong>${tempoTotal} minutos</strong>`;
+    document.getElementById("resumoRota").innerHTML = `
+        📍 Partida: <strong>${origem.rua}, ${origem.numero}</strong><br>
+        Distância Total Estimada: <strong>${distTotal.toFixed(1)} km</strong><br>
+        Tempo Estimado: <strong>${tempoTotal} minutos</strong>
+    `;
+    
     salvarLocal();
     render();
 }
@@ -414,7 +465,6 @@ function exportarPDF() {
     doc.text("Relatório de Roteiro de Entregas", 105, 20, { align: "center" });
     doc.setFontSize(11);
     doc.text(`Gerado em: ${new Date().toLocaleString()}`, 14, 30);
-
     const dados = entregas.map((e, i) => [e.ordem || i+1, e.id, `${e.rua}, ${e.numero}`, e.quantidade, e.distancia + " km", e.tempo + " min", e.status, e.observacoes || "-"]);
     doc.autoTable({ startY: 40, head: [["Ordem","ID","Endereço","Qtd","Dist.","Tempo","Status","Obs"]], body: dados });
     doc.save("Roteiro_Entregas.pdf");
@@ -423,9 +473,9 @@ function exportarPDF() {
 window.onload = function() {
     if (entregas.length === 0) {
         entregas = [
-            {id:"ENT-001", rua:"Rua José Bonifácio", numero:"120", quantidade:4, observacoes:"", status:"Pendente", ordem:1, distancia:"2.3", tempo:"12", lat:-8.05, lng:-34.88},
-            {id:"ENT-002", rua:"Rua da Aurora", numero:"580", quantidade:8, observacoes:"", status:"Pendente", ordem:2, distancia:"3.1", tempo:"18", lat:-8.04, lng:-34.87},
-            {id:"ENT-003", rua:"Rua Benfica", numero:"45", quantidade:12, observacoes:"", status:"Pendente", ordem:3, distancia:"4.5", tempo:"25", lat:-8.06, lng:-34.88}
+            {id:"ENT-001", rua:"Rua José Bonifácio", numero:"120", quantidade:4, observacoes:"", status:"Pendente", ordem:null, distancia:"2.3", tempo:"12", lat:-8.05, lng:-34.88},
+            {id:"ENT-002", rua:"Rua da Aurora", numero:"580", quantidade:8, observacoes:"", status:"Pendente", ordem:null, distancia:"3.1", tempo:"18", lat:-8.04, lng:-34.87},
+            {id:"ENT-003", rua:"Rua Benfica", numero:"45", quantidade:12, observacoes:"", status:"Pendente", ordem:null, distancia:"4.5", tempo:"25", lat:-8.06, lng:-34.88}
         ];
         salvarLocal();
     }
